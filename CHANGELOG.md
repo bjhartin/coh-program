@@ -3,6 +3,22 @@
 All notable changes to the Court of Honor Program Generator will be tracked
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.3] — 2026-07-26
+
+### Changed
+
+- **Optional agenda items no longer get dedicated booklet pages.** Guest
+  Speakers, Additional Recognition, and any other optional or custom
+  agenda entries now appear only as line items on the "Program" page,
+  matching how the printed docx has always been laid out. The booklet
+  is 2 pages shorter as a result (default output: 8 source pages → 4
+  imposed landscape sheets, previously 10 → 6).
+
+### Fixed
+
+- Updated the smoke-test page-count assertion to reflect the reduced
+  page count (4 imposed sheets, was 6).
+
 ## [1.3.2] — 2026-07-26
 
 ### Changed

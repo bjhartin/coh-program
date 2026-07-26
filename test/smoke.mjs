@@ -468,7 +468,7 @@ assert(Math.round(size0.width) === 792 && Math.round(size0.height) === 612,
 const padded = ((parsedSrc.getPageCount() + 3) >> 2) << 2;
 assert(outPages === padded / 2, `booklet page count = padded_source/2 (${padded}/2 = ${padded / 2})`);
 assert(outPages % 2 === 0, "booklet page count is even");
-assert(outPages === 6, "booklet is 6 landscape pages (10 source pages → 12 padded → 6 sheets, reflects v1.2.1 defaults w/ 2 optional pages)");
+assert(outPages === 4, "booklet is 4 landscape pages (8 source pages → 8 padded → 4 sheets; v1.3.3 no longer emits dedicated optional-section pages)");
 
 const fleurStat = fs.statSync(path.join(APP, "assets/fleur-de-lis.jpg"));
 assert(fleurStat.size > 50_000, `cover fleur is hi-res JPEG (${fleurStat.size} bytes > 50 KB)`);

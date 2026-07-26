@@ -260,15 +260,10 @@ export async function buildSourcePDF(model, pdfLib) {
   }
 
   // ---- Optional sections ----
-  // model.optionals is an ordered list of { key, item } derived from the
-  // unified agenda in app.js — one entry per optional item the user chose
-  // to include. Required sections (rank advancement, merit badges, SPL, etc.)
-  // are rendered above and are always present.
-  for (const opt of (model.optionals || [])) {
-    w.drawHeadingCentered(opt.item, H1, 10);
-    w.drawParagraph("(To be announced during the ceremony.)", { align: "center", size: BODY, spaceAfter: 12 });
-    w.pageBreak();
-  }
+  // Optional agenda items (Guest Speakers, Additional Recognition, etc.) are
+  // NOT rendered as their own booklet pages — they already appear as line
+  // items on the "Program" agenda page above. model.optionals is retained
+  // in the model for potential future use but intentionally not iterated.
 
   // ---- Scout Oath & Law ----
   w.drawHeadingCentered("Scout Oath", H1, 10);

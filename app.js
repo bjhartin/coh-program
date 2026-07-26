@@ -629,10 +629,8 @@ function renderPreview() {
     addPage(html);
   }
 
-  // Optional sections
-  for (const opt of (model.optionals || [])) {
-    addPage(`<h1>${escapeHtml(opt.item)}</h1><p class="center">(To be announced during the ceremony.)</p>`);
-  }
+  // Optional sections are NOT rendered as their own booklet pages —
+  // they appear as line items on the "Program" agenda page above.
 
   // Oath & Law
   addPage(`
