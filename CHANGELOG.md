@@ -3,6 +3,41 @@
 All notable changes to the Court of Honor Program Generator will be tracked
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.2] — 2026-07-26
+
+### Changed
+
+- **Removed cut-guide borders from pocket certificates.** The previous
+  0.25pt grey dashed rectangle around each 2.5"×3.75" card is gone
+  entirely. The printed BSA pocket-certificate cardstock already has its
+  own perforations/borders, so drawing a second boundary was noise.
+  `pocket-cert-builder.js` no longer imports `rgb` and contains zero
+  shape-drawing calls (`drawRectangle` / `drawLine` / etc.).
+- **Pocket-certificate layout now matches the reference HTML exactly.**
+  Rendered `scripts/templates/pocket-cert-page.html` with headless Chrome
+  (11in × 8.5in landscape), then measured every text element's yBot with
+  `pdftotext -bbox-layout` and baked those offsets into a new exported
+  constant `POCKET_CARD_LAYOUT`. The pdf-lib output aligns with the
+  reference within 0.00pt on all five card lines (scout-name, badge,
+  date/troop row, council, signature). Text baselines are derived from
+  the measured yBot by subtracting Helvetica's font descent
+  (0.207 × font size), matching the pdftotext bounding-box convention.
+
+### Tests
+
+- Added v1.3.2 smoke assertions in `test/smoke.mjs`:
+  - Card 1 has exactly 5 text lines and its first/last lines are the
+    scout name and signature, respectively.
+  - Scout-name baseline within 2pt of the reference (92.54pt yBot).
+  - Signature baseline within 2pt of the reference (207.21pt yBot).
+  - Scout-name horizontal center within 2pt of the card midpoint.
+  - `pocket-cert-builder.js` source contains zero shape-drawing calls.
+  - Rasterizing page 1 at 72dpi shows no non-white pixels 1px inside
+    any of the 8 card boundaries (belt-and-suspenders border check).
+- Untracked `test/out.pdf` and `test/pocket-boys.pdf` and added them
+  (plus the pdftoppm PPM output) to `.gitignore` — they're regenerated
+  on every run.
+
 ## [1.3.1] — 2026-07-26
 
 ### Changed

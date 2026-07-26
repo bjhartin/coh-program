@@ -1,3 +1,8 @@
 node_modules/
 package-lock.json
 test/source.pdf
+test/ref/
+test/pocket-boys-p1*.ppm
+test/pocket-boys.pdf
+test/out.pdf
+test/booklet.pdf

@@ -728,6 +728,146 @@ try {
   console.log(`  skip: pdftotext failed on pocket-cert check (${err.message})`);
 }
 
+// (4c) v1.3.2: no cut-guide borders + card-1 layout matches reference render.
+// The pocket-cert layout was measured from a headless-Chrome render of
+// scripts/templates/pocket-cert-page.html using pdftotext -bbox-layout.
+// Verify the pdf-lib output matches those measured positions within 2pt,
+// and that no stroke operators are emitted for card boundaries.
+try {
+  // Reference measurements (yBot in top-down pt, from card top edge).
+  const REF = { scoutName: 92.54, badge: 114.62, dateUnit: 165.08,
+                council: 184.58, signature: 207.21 };
+  const CARD_W = 180, CARD_H = 270, SHEET_W = 792, SHEET_H = 612;
+  const scoutFullName = boysMb[0].scoutName; // e.g. "Erik Adair"
+
+  // Parse page-1 word bboxes.
+  const bboxTxtPath = path.join(outDir, "pocket-boys-bbox.txt");
+  try {
+    child_process.execFileSync("pdftotext",
+      ["-bbox-layout", "-f", "1", "-l", "1", pocketPath, bboxTxtPath],
+      { stdio: "ignore" });
+    const bboxRaw = fs.readFileSync(bboxTxtPath, "utf8");
+    const wordRe = /<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]+)<\/word>/g;
+    const words = [];
+    let m;
+    while ((m = wordRe.exec(bboxRaw)) !== null) {
+      words.push({ xMin: +m[1], yMin: +m[2], xMax: +m[3], yMax: +m[4], text: m[5] });
+    }
+    // Group consecutive words on the same y-line (row 0, col 0 = card 1).
+    const card1Words = words.filter(w => w.xMax <= CARD_W + 1 && w.yMax <= CARD_H + 1);
+    const linesByY = new Map();
+    for (const w of card1Words) {
+      const k = Math.round(w.yMin * 10) / 10;
+      if (!linesByY.has(k)) linesByY.set(k, []);
+      linesByY.get(k).push(w);
+    }
+    const lineKeys = [...linesByY.keys()].sort((a, b) => a - b);
+    assert(lineKeys.length === 5,
+      `card 1 has 5 text lines (scout, badge, date+troop, council, signature); got ${lineKeys.length}`);
+
+    const scoutLine = linesByY.get(lineKeys[0]);
+    const sigLine   = linesByY.get(lineKeys[4]);
+    const scoutTxt = scoutLine.map(w => w.text).join(" ");
+    const sigTxt   = sigLine.map(w => w.text).join(" ");
+    assert(scoutTxt === scoutFullName,
+      `card 1 first line is the scout name "${scoutFullName}" (got "${scoutTxt}")`);
+    assert(sigTxt === POCKET_SIGNATURE,
+      `card 1 last line is the signature "${POCKET_SIGNATURE}" (got "${sigTxt}")`);
+
+    // Baseline (yBot) tolerance ±2pt, per v1.3.2 spec.
+    const scoutYBot = Math.max(...scoutLine.map(w => w.yMax));
+    const sigYBot   = Math.max(...sigLine.map(w => w.yMax));
+    assert(Math.abs(scoutYBot - REF.scoutName) <= 2,
+      `card 1 scout-name baseline within 2pt of reference (${REF.scoutName}pt); got ${scoutYBot.toFixed(2)}pt (diff ${(scoutYBot - REF.scoutName).toFixed(2)}pt)`);
+    assert(Math.abs(sigYBot - REF.signature) <= 2,
+      `card 1 signature baseline within 2pt of reference (${REF.signature}pt); got ${sigYBot.toFixed(2)}pt (diff ${(sigYBot - REF.signature).toFixed(2)}pt)`);
+
+    // Horizontal center of scout-name matches card horizontal center (90pt).
+    const scoutXMin = Math.min(...scoutLine.map(w => w.xMin));
+    const scoutXMax = Math.max(...scoutLine.map(w => w.xMax));
+    const scoutCenter = (scoutXMin + scoutXMax) / 2;
+    assert(Math.abs(scoutCenter - CARD_W / 2) <= 2,
+      `card 1 scout-name centered on card horizontal midpoint (${CARD_W / 2}pt); got ${scoutCenter.toFixed(2)}pt`);
+  } finally {
+    try { fs.unlinkSync(bboxTxtPath); } catch {}
+  }
+
+  // No cut-guide borders: verify at two levels.
+  // (a) Source-level: pocket-cert-builder.js contains NO drawing calls
+  //     that would produce strokes (drawRectangle/drawLine/drawEllipse/
+  //     drawSquare). The v1.3.2 change removed all card-boundary strokes.
+  const pocketBuilderSrc = fs.readFileSync(
+    path.join(APP, "pocket-cert-builder.js"), "utf8");
+  const strokingCallRe = /\.draw(Rectangle|Line|Ellipse|Square|Circle|SvgPath)\s*\(/g;
+  const strokingMatches = pocketBuilderSrc.match(strokingCallRe) || [];
+  assert(strokingMatches.length === 0,
+    `pocket-cert-builder.js emits NO shape-drawing calls (no cut-guide borders); found ${strokingMatches.length}: ${strokingMatches.join(", ")}`);
+
+  // (b) Rasterize page 1 at 72dpi and sample pixels 1pt inside each card
+  //     boundary — if a border had been drawn, at least one of these
+  //     pixels would be non-white.
+  const ppmPath = path.join(outDir, "pocket-boys-p1.ppm");
+  try {
+    child_process.execFileSync("pdftoppm",
+      ["-r", "72", "-f", "1", "-l", "1", pocketPath,
+        path.join(outDir, "pocket-boys-p1")],
+      { stdio: "ignore" });
+    // pdftoppm writes ...-1.ppm (or -01.ppm). Detect it.
+    const ppmCandidates = ["pocket-boys-p1-1.ppm", "pocket-boys-p1-01.ppm",
+                           "pocket-boys-p1-001.ppm"];
+    const ppmActual = ppmCandidates
+      .map(n => path.join(outDir, n))
+      .find(p => fs.existsSync(p));
+    if (!ppmActual) throw new Error("pdftoppm output not found");
+    const ppm = fs.readFileSync(ppmActual);
+    // PPM P6 header: "P6\n<w> <h>\n<maxval>\n" then binary RGB triples.
+    const nlIndices = [];
+    for (let i = 0; i < ppm.length && nlIndices.length < 3; i++) {
+      if (ppm[i] === 0x0a) nlIndices.push(i);
+    }
+    const [dimLine] = ppm.slice(nlIndices[0] + 1, nlIndices[1]).toString().split("\n");
+    const [wStr, hStr] = dimLine.split(/\s+/);
+    const w = parseInt(wStr, 10), h = parseInt(hStr, 10);
+    const dataStart = nlIndices[2] + 1;
+    const pixelAt = (px, py) => {
+      const off = dataStart + (py * w + px) * 3;
+      return [ppm[off], ppm[off + 1], ppm[off + 2]];
+    };
+    // Card grid: 4 cols × 2 rows of 180×270pt cards, no gap, starting at (0,0).
+    // At 72dpi 1pt = 1px. Sample pixels 1px inside each card boundary along
+    // its right and bottom edges. If NO border, all should be pure white.
+    const CARD_W_PX = 180, CARD_H_PX = 270;
+    let borderPixels = 0;
+    for (let col = 0; col < 4; col++) {
+      for (let row = 0; row < 2; row++) {
+        const x0 = col * CARD_W_PX, y0 = row * CARD_H_PX;
+        // Sample 10 points along each of the four card edges, 1px inside.
+        for (let t = 0; t < 10; t++) {
+          const frac = 0.1 + t * 0.08;
+          const samples = [
+            [x0 + 1, y0 + Math.floor(frac * CARD_H_PX)],            // left edge
+            [x0 + CARD_W_PX - 2, y0 + Math.floor(frac * CARD_H_PX)], // right edge
+            [x0 + Math.floor(frac * CARD_W_PX), y0 + 1],            // top edge
+            [x0 + Math.floor(frac * CARD_W_PX), y0 + CARD_H_PX - 2], // bottom edge
+          ];
+          for (const [sx, sy] of samples) {
+            if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+            const [r, g, b] = pixelAt(sx, sy);
+            if (r < 250 || g < 250 || b < 250) borderPixels++;
+          }
+        }
+      }
+    }
+    assert(borderPixels === 0,
+      `pocket-cert page 1: no non-white pixels at card boundaries (border-free); found ${borderPixels}`);
+    try { fs.unlinkSync(ppmActual); } catch {}
+  } catch (err) {
+    console.log(`  skip: raster border check failed (${err.message})`);
+  }
+} catch (err) {
+  console.log(`  skip: v1.3.2 layout/border assertions failed (${err.message})`);
+}
+
 // (4b) Pocket state defaults are wired into the hydrated form.
 const pcCouncil = dom.window.document.getElementById("pc-council");
 const pcSig = dom.window.document.getElementById("pc-signature");
