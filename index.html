@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Court of Honor Program Generator</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="icon" href="./assets/fleur-de-lis.jpg" />
+  </head>
+  <body>
+    <header class="site-header">
+      <img src="./assets/fleur-de-lis.jpg" alt="" class="mark" />
+      <div>
+        <h1>Court of Honor Program Generator</h1>
+        <p class="tag">Generate print-ready Court of Honor booklet programs from Scoutbook Purchase Orders.</p>
+      </div>
+      <div class="header-actions">
+        <button id="btn-save" type="button" title="Save your inputs and roster to a JSON file">Save session</button>
+        <label class="file-btn" for="load-session">Load session</label>
+        <input id="load-session" type="file" accept=".json,application/json" hidden />
+      </div>
+    </header>
+
+    <main>
+      <!-- STEP 1: Uploads -->
+      <section class="step" id="step-upload">
+        <h2><span class="step-num">1</span> Upload Purchase Orders</h2>
+        <p class="hint">
+          Drop each troop's Scoutbook Purchase Order CSV. Filenames like
+          <code>PO_T96BT_1103345.csv</code> or <code>PO_T96GT_1103346.csv</code> auto-fill the troop label.
+          A second troop is optional — leave the second slot empty for a single-troop CoH.
+        </p>
+        <div class="troops-grid">
+          <div class="troop-slot" data-slot="0">
+            <label>
+              Troop label
+              <input type="text" data-field="troopLabel" placeholder="Troop 96B" />
+            </label>
+            <div class="dropzone" tabindex="0">
+              <p class="dz-label">Drop <strong>Troop A</strong> PO CSV here, or click to choose.</p>
+              <p class="dz-summary" data-field="summary"></p>
+              <input type="file" accept=".csv,text/csv" hidden />
+            </div>
+            <button type="button" class="linkish" data-action="load-sample" data-sample="sample-boys.csv">Load sample boys PO</button>
+          </div>
+          <div class="troop-slot" data-slot="1">
+            <label>
+              Troop label
+              <input type="text" data-field="troopLabel" placeholder="Troop 96G (optional)" />
+            </label>
+            <div class="dropzone" tabindex="0">
+              <p class="dz-label">Drop <strong>Troop B</strong> PO CSV here, or click to choose.</p>
+              <p class="dz-summary" data-field="summary"></p>
+              <input type="file" accept=".csv,text/csv" hidden />
+            </div>
+            <button type="button" class="linkish" data-action="load-sample" data-sample="sample-girls.csv">Load sample girls PO</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 2: Event details -->
+      <section class="step" id="step-event">
+        <h2><span class="step-num">2</span> Event details</h2>
+        <div class="grid two">
+          <label>Event date <input type="date" id="ev-date" /></label>
+          <label>Event time <input type="text" id="ev-time" placeholder="6:30 PM" /></label>
+          <label class="span-2">Venue <textarea id="ev-venue" rows="2" placeholder="New Hope United Methodist Church&#10;Sanctuary"></textarea></label>
+          <label>MC name <input type="text" id="ev-mc" placeholder="e.g. Isaac Samo" /></label>
+          <label>Scoutmaster Minute presenter(s) <input type="text" id="ev-smm" placeholder="e.g. Scoutmaster" /></label>
+          <label>Cover title <input type="text" id="ev-title" placeholder="Court of Honor" /></label>
+          <label>Council / org line <input type="text" id="ev-org" placeholder="Mid-Iowa Council · BSA" /></label>
+        </div>
+      </section>
+
+      <!-- STEP 3: Program Sections & Agenda (merged) -->
+      <section class="step" id="step-agenda">
+        <h2><span class="step-num">3</span> Program Sections &amp; Agenda</h2>
+        <p class="hint">
+          This one list controls both the printed agenda page and which content
+          sections appear elsewhere in the booklet.
+          <strong>Required</strong> rows are locked in (traditional/BSA CoH items);
+          you can edit their presenter text and reorder them, but not remove them.
+          <strong>Optional</strong> rows are off by default — check <em>Include</em>
+          to add them to the agenda and print a matching page.
+          <strong>Custom</strong> rows are agenda-only (no content page) — use
+          them for memorials, guest speakers, songs, or anything else.
+        </p>
+        <table class="agenda-table" id="agenda-table">
+          <thead><tr><th></th><th>Item</th><th>Presenter</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button type="button" id="btn-add-agenda">+ Add item</button>
+        <fieldset style="margin-top: 18px;">
+          <legend>Roster grouping &amp; sort</legend>
+          <div class="grid two">
+            <label>Rank Advancement grouping
+              <select id="grp-rank">
+                <option value="combined">By rank, troops combined (default)</option>
+                <option value="byTroop">By troop, then by rank</option>
+              </select>
+            </label>
+            <label>Merit Badges grouping
+              <select id="grp-mb">
+                <option value="combined">One alphabetical list, troops combined (default)</option>
+                <option value="byTroop">Separate lists per troop</option>
+              </select>
+            </label>
+            <label>Merit Badges sort
+              <select id="grp-mbsort">
+                <option value="last">By last name (default)</option>
+                <option value="first">By first name</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <!-- STEP 4: Preview -->
+      <section class="step" id="step-preview">
+        <h2><span class="step-num">4</span> Preview</h2>
+        <p class="hint">Half-letter portrait pages, rendered at ~55% scale. Regenerated live as you edit.</p>
+        <div class="preview-pages" id="preview"></div>
+      </section>
+
+      <!-- STEP 5: Download -->
+      <section class="step" id="step-download">
+        <h2><span class="step-num">5</span> Download</h2>
+        <p class="hint">
+          Use the <strong>source</strong> PDF for archival or if you need to re-impose with another tool.
+          Use the <strong>booklet</strong> PDF for printing: duplex long-edge (the printer default),
+          US Letter, no scaling, then fold each sheet in half along the vertical center.
+        </p>
+        <div class="download-row">
+          <button type="button" id="btn-source" disabled>Download source PDF (5.5×8.5, portrait)</button>
+          <button type="button" id="btn-booklet" disabled>Download booklet PDF (11×8.5, imposed)</button>
+        </div>
+        <p class="hint" id="dl-status"></p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        <a href="./README.md">README</a> ·
+        <a href="./CHANGELOG.md">Changelog</a> ·
+        Fully static; open <code>index.html</code> directly or deploy to GitHub Pages.
+      </p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
