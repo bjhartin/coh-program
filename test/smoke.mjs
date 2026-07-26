@@ -91,9 +91,41 @@ assertEarly(smField?.value === "Brad Johnson and Carol Donelly",
 const troopAField = dom.window.document.querySelector('.troop-slot[data-slot="0"] input[data-field="troopLabel"]');
 const troopBField = dom.window.document.querySelector('.troop-slot[data-slot="1"] input[data-field="troopLabel"]');
 assertEarly(troopAField?.value === "Troop 96B",
-  `Troop A default label is "Troop 96B" (got "${troopAField?.value}")`);
+  `Boys Troop default label is "Troop 96B" (got "${troopAField?.value}")`);
 assertEarly(troopBField?.value === "Troop 96G",
-  `Troop B default label is "Troop 96G" (got "${troopBField?.value}")`);
+  `Girls Troop default label is "Troop 96G" (got "${troopBField?.value}")`);
+
+// --- (1c) v1.3.1: slot-position UI text renames "Troop A"/"Troop B" to
+// "Boys Troop"/"Girls Troop" everywhere the slot is user-facing. The
+// data-model prefix stays `slot=0`/`slot=1`; only the visible copy changes.
+const dzA = dom.window.document.querySelector('.troop-slot[data-slot="0"] .dz-label');
+const dzB = dom.window.document.querySelector('.troop-slot[data-slot="1"] .dz-label');
+assertEarly(dzA && /Boys Troop/.test(dzA.textContent) && !/Troop A/.test(dzA.textContent),
+  `Boys slot dropzone label reads "Boys Troop" (no "Troop A"). Got: "${dzA?.textContent?.trim()}"`);
+assertEarly(dzB && /Girls Troop/.test(dzB.textContent) && !/Troop B/.test(dzB.textContent),
+  `Girls slot dropzone label reads "Girls Troop" (no "Troop B"). Got: "${dzB?.textContent?.trim()}"`);
+// Pocket-cert download buttons carry the new copy pre-upload (troop label
+// falls back to the slot-position name when no PO is loaded).
+const preBtnA = dom.window.document.getElementById("btn-pocket-a");
+const preBtnB = dom.window.document.getElementById("btn-pocket-b");
+assertEarly(preBtnA && !/Troop A/.test(preBtnA.textContent),
+  `pocket-cert Boys button text has no "Troop A" (got "${preBtnA?.textContent}")`);
+assertEarly(preBtnB && !/Troop B/.test(preBtnB.textContent),
+  `pocket-cert Girls button text has no "Troop B" (got "${preBtnB?.textContent}")`);
+// Pocket-cert form labels for the two identifier fields reference the new copy.
+const pcTroopALabel = dom.window.document.querySelector('label:has(#pc-troop-a)');
+const pcTroopBLabel = dom.window.document.querySelector('label:has(#pc-troop-b)');
+assertEarly(pcTroopALabel && /Boys Troop/.test(pcTroopALabel.textContent),
+  `pocket-cert Boys identifier label mentions "Boys Troop"`);
+assertEarly(pcTroopBLabel && /Girls Troop/.test(pcTroopBLabel.textContent) && !/Troop B/.test(pcTroopBLabel.textContent.replace(/Girls Troop/g, "")),
+  `pocket-cert Girls identifier label mentions "Girls Troop" (no "Troop B")`);
+// Global sweep: no user-facing "Troop A" / "Troop B" text survives in the
+// rendered SPA DOM. Reads the entire visible body text at once.
+const bodyText = dom.window.document.body.textContent || "";
+assertEarly(!/\bTroop A\b/.test(bodyText),
+  `no "Troop A" appears anywhere in the rendered DOM`);
+assertEarly(!/\bTroop B\b/.test(bodyText),
+  `no "Troop B" appears anywhere in the rendered DOM`);
 
 // --- (2) SPL Update cannot be excluded.
 // Structural: no optional entry has key 'spl' or 'spl-update' in the defaults.
@@ -708,13 +740,13 @@ assert(pcCouncil?.value === "Mid-Iowa Council",
 assert(pcSig?.value === "",
   `pocket signature field defaults to empty (got "${pcSig?.value}")`);
 assert(pcTroopA?.value === "96 B",
-  `pocket Troop A identifier defaults to "96 B" (got "${pcTroopA?.value}")`);
+  `pocket Boys Troop identifier defaults to "96 B" (got "${pcTroopA?.value}")`);
 assert(pcTroopB?.value === "96 G",
-  `pocket Troop B identifier defaults to "96 G" (got "${pcTroopB?.value}")`);
+  `pocket Girls Troop identifier defaults to "96 G" (got "${pcTroopB?.value}")`);
 assert(pcBtnA && pcBtnA.disabled === true,
-  `pocket Troop A download button starts disabled (no CSV uploaded yet)`);
+  `pocket Boys Troop download button starts disabled (no CSV uploaded yet)`);
 assert(pcBtnB && pcBtnB.disabled === true,
-  `pocket Troop B download button starts disabled`);
+  `pocket Girls Troop download button starts disabled`);
 
 // (4c) Session migration backfills the `pocket` sub-state for older sessions.
 const legacyNoPocket = app.migrateSession({ version: 2, agenda: [] });

@@ -37,7 +37,7 @@
               <input type="text" data-field="troopLabel" placeholder="Troop 96B" />
             </label>
             <div class="dropzone" tabindex="0">
-              <p class="dz-label">Drop <strong>Troop A</strong> PO CSV here, or click to choose.</p>
+              <p class="dz-label">Drop <strong>Boys Troop</strong> PO CSV here, or click to choose.</p>
               <p class="dz-summary" data-field="summary"></p>
               <input type="file" accept=".csv,text/csv" hidden />
             </div>
@@ -49,7 +49,7 @@
               <input type="text" data-field="troopLabel" placeholder="Troop 96G (optional)" />
             </label>
             <div class="dropzone" tabindex="0">
-              <p class="dz-label">Drop <strong>Troop B</strong> PO CSV here, or click to choose.</p>
+              <p class="dz-label">Drop <strong>Girls Troop</strong> PO CSV here, or click to choose.</p>
               <p class="dz-summary" data-field="summary"></p>
               <input type="file" accept=".csv,text/csv" hidden />
             </div>
@@ -154,16 +154,16 @@
           <label>Default date earned <input type="date" id="pc-default-date" />
             <span class="fieldhint">Used when a PO row has no Date Earned. Defaults to the Event Date.</span>
           </label>
-          <label>Troop identifier on cards <input type="text" id="pc-troop-a" placeholder="e.g. 96 B" />
-            <span class="fieldhint">Free text — some troops render as "96 B" with a space. Applies to Troop A cards.</span>
+          <label>Boys Troop identifier on cards <input type="text" id="pc-troop-a" placeholder="e.g. 96 B" />
+            <span class="fieldhint">Free text — some troops render as "96 B" with a space. Applies to Boys Troop cards.</span>
           </label>
-          <label>Troop B identifier on cards <input type="text" id="pc-troop-b" placeholder="e.g. 96 G" />
-            <span class="fieldhint">Only used if Troop B PO is uploaded. Applies to Troop B cards.</span>
+          <label>Girls Troop identifier on cards <input type="text" id="pc-troop-b" placeholder="e.g. 96 G" />
+            <span class="fieldhint">Only used if Girls Troop PO is uploaded. Applies to Girls Troop cards.</span>
           </label>
         </div>
         <div class="download-row" style="margin-top: 12px;">
-          <button type="button" id="btn-pocket-a" disabled>Download Troop A Pocket Certificates PDF</button>
-          <button type="button" id="btn-pocket-b" disabled>Download Troop B Pocket Certificates PDF</button>
+          <button type="button" id="btn-pocket-a" disabled>Download Boys Troop Pocket Certificates PDF</button>
+          <button type="button" id="btn-pocket-b" disabled>Download Girls Troop Pocket Certificates PDF</button>
         </div>
         <p class="hint" id="pc-status"></p>
       </section>

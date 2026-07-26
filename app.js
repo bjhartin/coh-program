@@ -690,7 +690,7 @@ function updatePocketButtons() {
     const btn = $(`#btn-pocket-${slot === 0 ? "a" : "b"}`);
     if (!btn) continue;
     const troop = parsedTroops[slot];
-    const label = state.troops[slot]?.troopLabel || (slot === 0 ? "Troop A" : "Troop B");
+    const label = state.troops[slot]?.troopLabel || (slot === 0 ? "Boys Troop" : "Girls Troop");
     if (!troop || !state.troops[slot]?.csvText) {
       btn.disabled = true;
       btn.textContent = `Download ${label} Pocket Certificates PDF`;
@@ -738,7 +738,7 @@ async function downloadPocketCertsForSlot(slot) {
     status.textContent = "No merit-badge rows found in that PO.";
     return;
   }
-  const label = state.troops[slot].troopLabel || (slot === 0 ? "Troop A" : "Troop B");
+  const label = state.troops[slot].troopLabel || (slot === 0 ? "Boys Troop" : "Girls Troop");
   status.textContent = `Building ${label} pocket certificates…`;
   try {
     const pdfLib = await loadPdfLib();

@@ -3,6 +3,31 @@
 All notable changes to the Court of Honor Program Generator will be tracked
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.1] — 2026-07-26
+
+### Changed
+
+- Renamed the slot-position UI labels **"Troop A" → "Boys Troop"** and
+  **"Troop B" → "Girls Troop"** everywhere they appear in visible copy:
+  the Step 1 dropzone prompts, the Step 6 pocket-certificate identifier
+  form labels + field hints, and the two pocket-cert download buttons
+  (both the pre-upload static text and the runtime fallback used when
+  no PO has been loaded yet).
+- The editable *troop label* defaults (`Troop 96B` / `Troop 96G`) and the
+  pocket-cert *troop identifier* defaults (`96 B` / `96 G`) are unchanged;
+  only the position-neutral "A"/"B" slot names were renamed.
+- Data-model identifiers (`state.troops[0]` / `[1]`, `data-slot="0"`/`"1"`,
+  the `-a` / `-b` element ID suffixes) are unchanged — this is a pure
+  copy change with no schema impact and no migration required.
+
+### Tests
+
+- 8 new smoke assertions covering the new copy: dropzone labels,
+  pocket-cert button text, pocket-cert form-field labels, and a global
+  sweep asserting no user-facing `\bTroop A\b` / `\bTroop B\b` text
+  survives anywhere in the rendered DOM. Existing pocket-cert assertion
+  messages updated to the new naming.
+
 ## [1.3.0] — 2026-07-26
 
 ### Added
