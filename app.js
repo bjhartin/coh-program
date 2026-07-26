@@ -1,8 +1,9 @@
 // app.js — glue between the DOM and the data/pdf modules.
 // Loaded as an ES module in index.html.
 
-import { parsePO, guessTroopLabel, buildRoster } from "./data.js";
+import { parsePO, guessTroopLabel, buildRoster, extractMeritBadgeRows } from "./data.js";
 import { buildSourcePDF, buildBookletPDF } from "./pdf-builder.js";
+import { buildPocketCertsPDF, pocketCertSheetCount, POCKET_CARDS_PER_SHEET } from "./pocket-cert-builder.js";
 
 // pdf-lib via ESM CDN.
 const PDF_LIB_URL = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm";
@@ -83,6 +84,16 @@ const state = {
   },
   grouping: { rank: "combined", mb: "combined", mbSort: "last" },
   agenda: buildDefaultAgenda(),
+  // v1.3.0: Pocket certificate defaults. `troopIdents` is a 2-slot array
+  // matching `state.troops`; free-text so volunteers can enter "96 B",
+  // "Troop 96", etc. `defaultDate` mirrors `event.date` unless the user
+  // overrides it.
+  pocket: {
+    council: "Mid-Iowa Council",
+    signature: "",
+    defaultDate: "",
+    troopIdents: ["96 B", "96 G"],
+  },
 };
 
 /**
@@ -221,6 +232,18 @@ export function migrateSession(loaded) {
     delete loaded.sections;
   }
   loaded.version = 2;
+  // v1.3.0: ensure a `pocket` sub-state exists so older sessions get the
+  // pocket-cert defaults without clobbering any per-user overrides.
+  if (!loaded.pocket || typeof loaded.pocket !== "object") {
+    loaded.pocket = { council: "Mid-Iowa Council", signature: "", defaultDate: "", troopIdents: ["96 B", "96 G"] };
+  } else {
+    if (typeof loaded.pocket.council !== "string") loaded.pocket.council = "Mid-Iowa Council";
+    if (typeof loaded.pocket.signature !== "string") loaded.pocket.signature = "";
+    if (typeof loaded.pocket.defaultDate !== "string") loaded.pocket.defaultDate = "";
+    if (!Array.isArray(loaded.pocket.troopIdents)) loaded.pocket.troopIdents = ["96 B", "96 G"];
+    loaded.pocket.troopIdents[0] = loaded.pocket.troopIdents[0] || "96 B";
+    loaded.pocket.troopIdents[1] = loaded.pocket.troopIdents[1] || "96 G";
+  }
   return loaded;
 }
 
@@ -649,6 +672,111 @@ function renderPreview() {
   const anyTroop = parsedTroops.some(Boolean);
   $("#btn-source").disabled = !anyTroop;
   $("#btn-booklet").disabled = !anyTroop;
+
+  // v1.3.0: refresh pocket cert button labels / enablement.
+  updatePocketButtons();
+}
+
+// ---------- Pocket certificates (v1.3.0) ----------
+
+/**
+ * Recompute the MB row count for a slot from its parsed troop, and update
+ * the corresponding download button's label + disabled state. Called on
+ * every refresh() so any change to CSVs / troop labels / event date is
+ * reflected in the button copy live.
+ */
+function updatePocketButtons() {
+  for (const slot of [0, 1]) {
+    const btn = $(`#btn-pocket-${slot === 0 ? "a" : "b"}`);
+    if (!btn) continue;
+    const troop = parsedTroops[slot];
+    const label = state.troops[slot]?.troopLabel || (slot === 0 ? "Troop A" : "Troop B");
+    if (!troop || !state.troops[slot]?.csvText) {
+      btn.disabled = true;
+      btn.textContent = `Download ${label} Pocket Certificates PDF`;
+      continue;
+    }
+    const rows = extractMeritBadgeRows(state.troops[slot].csvText);
+    const sheets = pocketCertSheetCount(rows.length);
+    btn.disabled = rows.length === 0;
+    btn.textContent = rows.length === 0
+      ? `Download ${label} Pocket Certificates PDF (no MB items)`
+      : `Download ${label} Pocket Certificates PDF (${rows.length} cards on ${sheets} sheet${sheets === 1 ? "" : "s"})`;
+  }
+}
+
+/** Format an ISO YYYY-MM-DD into "Month D, YYYY" (used as the default date). */
+function prettyDateForPocket(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y) return iso;
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  return dt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
+/** Resolve the default date for pocket-cert rows that have no per-row date. */
+function pocketDefaultDate() {
+  const explicit = (state.pocket.defaultDate || "").trim();
+  const iso = explicit || state.event.date || "";
+  return prettyDateForPocket(iso);
+}
+
+/** Sanitize a troop label for use in a filename. "Troop 96B" → "Troop-96B". */
+function slugForFilename(s) {
+  return String(s || "troop").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "troop";
+}
+
+async function downloadPocketCertsForSlot(slot) {
+  const status = $("#pc-status");
+  const troop = parsedTroops[slot];
+  if (!troop || !state.troops[slot]?.csvText) {
+    status.textContent = "Upload the PO for that troop first.";
+    return;
+  }
+  const rows = extractMeritBadgeRows(state.troops[slot].csvText);
+  if (!rows.length) {
+    status.textContent = "No merit-badge rows found in that PO.";
+    return;
+  }
+  const label = state.troops[slot].troopLabel || (slot === 0 ? "Troop A" : "Troop B");
+  status.textContent = `Building ${label} pocket certificates…`;
+  try {
+    const pdfLib = await loadPdfLib();
+    const bytes = await buildPocketCertsPDF(rows, {
+      defaultDate: pocketDefaultDate(),
+      troop: state.pocket.troopIdents[slot] || "",
+      council: state.pocket.council || "",
+      signature: state.pocket.signature || "",
+    }, pdfLib);
+    downloadBytes(bytes, `${slugForFilename(label)}-pocket-certificates.pdf`, "application/pdf");
+    const sheets = pocketCertSheetCount(rows.length);
+    status.textContent = `${label} pocket certificates downloaded (${rows.length} cards on ${sheets} sheet${sheets === 1 ? "" : "s"}). Print at 100% scale, no fit-to-page, then cut on the grey guides.`;
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Failed: " + err.message;
+  }
+}
+
+function wirePocketCerts() {
+  const bind = (id, path) => {
+    const el = $(id);
+    el.addEventListener("input", () => {
+      const parts = path.split(".");
+      let obj = state;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+      obj[parts[parts.length - 1]] = el.value;
+      refresh();
+    });
+  };
+  bind("#pc-council", "pocket.council");
+  bind("#pc-signature", "pocket.signature");
+  bind("#pc-default-date", "pocket.defaultDate");
+  const troopA = $("#pc-troop-a");
+  const troopB = $("#pc-troop-b");
+  troopA.addEventListener("input", () => { state.pocket.troopIdents[0] = troopA.value; });
+  troopB.addEventListener("input", () => { state.pocket.troopIdents[1] = troopB.value; });
+  $("#btn-pocket-a").addEventListener("click", () => downloadPocketCertsForSlot(0));
+  $("#btn-pocket-b").addEventListener("click", () => downloadPocketCertsForSlot(1));
 }
 
 // ---------- PDF downloads ----------
@@ -727,6 +855,12 @@ function hydrateForm() {
   $("#grp-rank").value = state.grouping.rank;
   $("#grp-mb").value = state.grouping.mb;
   $("#grp-mbsort").value = state.grouping.mbSort;
+  // Pocket-cert fields (v1.3.0).
+  $("#pc-council").value = state.pocket?.council ?? "Mid-Iowa Council";
+  $("#pc-signature").value = state.pocket?.signature ?? "";
+  $("#pc-default-date").value = state.pocket?.defaultDate ?? "";
+  $("#pc-troop-a").value = state.pocket?.troopIdents?.[0] ?? "96 B";
+  $("#pc-troop-b").value = state.pocket?.troopIdents?.[1] ?? "96 G";
 }
 
 // ---------- Refresh (debounced) ----------
@@ -742,6 +876,7 @@ async function init() {
   wireAgenda();
   renderAgenda();
   wireDownloads();
+  wirePocketCerts();
   wireSaveLoad();
   hydrateForm();
 

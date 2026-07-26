@@ -136,6 +136,37 @@
         </div>
         <p class="hint" id="dl-status"></p>
       </section>
+
+      <!-- STEP 6: Pocket Certificates -->
+      <section class="step" id="step-pocket">
+        <h2><span class="step-num">6</span> Pocket Certificates</h2>
+        <p class="hint">
+          Generate BSA <strong>Merit Badge pocket certificates</strong> — 8 per
+          landscape US Letter sheet, ready to cut apart with a paper cutter.
+          Only merit badges are printed here; ranks and misc awards use BSA's
+          pre-printed cards, which are hand-filled.
+        </p>
+        <div class="grid two">
+          <label>Council <input type="text" id="pc-council" placeholder="Mid-Iowa Council" /></label>
+          <label>Signature (Scoutmaster / Advancement Chair)
+            <input type="text" id="pc-signature" placeholder="e.g. Brian J Hartin" />
+          </label>
+          <label>Default date earned <input type="date" id="pc-default-date" />
+            <span class="fieldhint">Used when a PO row has no Date Earned. Defaults to the Event Date.</span>
+          </label>
+          <label>Troop identifier on cards <input type="text" id="pc-troop-a" placeholder="e.g. 96 B" />
+            <span class="fieldhint">Free text — some troops render as "96 B" with a space. Applies to Troop A cards.</span>
+          </label>
+          <label>Troop B identifier on cards <input type="text" id="pc-troop-b" placeholder="e.g. 96 G" />
+            <span class="fieldhint">Only used if Troop B PO is uploaded. Applies to Troop B cards.</span>
+          </label>
+        </div>
+        <div class="download-row" style="margin-top: 12px;">
+          <button type="button" id="btn-pocket-a" disabled>Download Troop A Pocket Certificates PDF</button>
+          <button type="button" id="btn-pocket-b" disabled>Download Troop B Pocket Certificates PDF</button>
+        </div>
+        <p class="hint" id="pc-status"></p>
+      </section>
     </main>
 
     <footer class="site-footer">

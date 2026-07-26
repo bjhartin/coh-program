@@ -18,8 +18,9 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import * as pdfLib from "pdf-lib";
 
-import { parsePO, guessTroopLabel, buildRoster } from "../data.js";
+import { parsePO, guessTroopLabel, buildRoster, extractMeritBadgeRows } from "../data.js";
 import { buildSourcePDF, buildBookletPDF } from "../pdf-builder.js";
+import { buildPocketCertsPDF, pocketCertSheetCount, POCKET_CARDS_PER_SHEET } from "../pocket-cert-builder.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(__dirname, "..");
@@ -567,6 +568,171 @@ try {
 } catch (err) {
   console.log(`  skip: pdftoppm not available or failed (${err.message}); border/orientation raster check skipped`);
 }
+
+// --- (4) Pocket certificates (v1.3.0) ---
+// MB-only filter: extract from both sample POs and assert ranks/misc excluded.
+const boysMb = extractMeritBadgeRows(boysCsv);
+const girlsMb = extractMeritBadgeRows(girlsCsv);
+console.log(`Boys MB rows: ${boysMb.length}, girls MB rows: ${girlsMb.length}`);
+// Every row's badge name should be free of "Rank"/"Emblem" suffixes (cleanItem
+// already handles this, but sanity-check the extractor didn't smuggle any in).
+const badgeNames = [...boysMb, ...girlsMb].map((r) => r.badge);
+assert(badgeNames.every((b) => !/(Rank|MB Emblem| Emblem)$/.test(b)),
+  `extracted badge names have no rank/emblem suffixes (${badgeNames.filter((b) => /(Rank|MB Emblem| Emblem)$/.test(b)).join(", ")})`);
+// Cross-check: fixture "Adair" scout has multiple MB rows.
+const adair = boysMb.filter((r) => r.lastName === "Adair");
+assert(adair.length >= 2, `MB extractor returned multiple rows for scout "Adair" (got ${adair.length})`);
+// The extractor must EXCLUDE any Badges-of-Rank or Misc-Awards rows. Compare
+// against parsePO which knows the totals.
+assert(boysMb.length === boys.meritBadges ? true : true, "smoke reads MB rows"); // no-op guard for readability
+// Sum of items in the per-scout MB map == number of rows extracted.
+let boysMbFromParsed = 0;
+for (const v of boys.meritBadges.values()) boysMbFromParsed += v.items.length;
+assert(boysMb.length === boysMbFromParsed,
+  `MB extractor row count matches parsePO MB item count for boys (extractor=${boysMb.length}, parsed=${boysMbFromParsed})`);
+let girlsMbFromParsed = 0;
+for (const v of girls.meritBadges.values()) girlsMbFromParsed += v.items.length;
+assert(girlsMb.length === girlsMbFromParsed,
+  `MB extractor row count matches parsePO MB item count for girls (extractor=${girlsMb.length}, parsed=${girlsMbFromParsed})`);
+// No row's badge should equal a canonical rank name.
+const RANK_NAMES = ["Scout", "Tenderfoot", "Second Class", "First Class", "Star", "Life", "Eagle", "Eagle Palm", "Star Scout", "Life Scout", "Eagle Scout"];
+assert(!badgeNames.some((b) => RANK_NAMES.includes(b)),
+  "no extracted MB row is actually a rank");
+
+// Build a pocket cert PDF for the boys and validate structure.
+const POCKET_DEFAULT_DATE = "July 27, 2026";
+const POCKET_COUNCIL = "Mid-Iowa Council";
+const POCKET_SIGNATURE = "Brian J Hartin";
+const pocketBytes = await buildPocketCertsPDF(boysMb, {
+  defaultDate: POCKET_DEFAULT_DATE,
+  troop: "96 B",
+  council: POCKET_COUNCIL,
+  signature: POCKET_SIGNATURE,
+}, pdfLib);
+const pocketPath = path.join(outDir, "pocket-boys.pdf");
+fs.writeFileSync(pocketPath, pocketBytes);
+console.log(`Wrote test/pocket-boys.pdf (${pocketBytes.length} bytes)`);
+const parsedPocket = await pdfLib.PDFDocument.load(pocketBytes);
+const expectedSheets = Math.ceil(boysMb.length / POCKET_CARDS_PER_SHEET);
+assert(parsedPocket.getPageCount() === expectedSheets,
+  `pocket PDF page count = ceil(${boysMb.length}/8) = ${expectedSheets} (got ${parsedPocket.getPageCount()})`);
+const pcSize = parsedPocket.getPage(0).getSize();
+assert(Math.round(pcSize.width) === 792 && Math.round(pcSize.height) === 612,
+  `pocket page 0 is landscape US Letter (792x612 pts), got ${Math.round(pcSize.width)}x${Math.round(pcSize.height)}`);
+// pocketCertSheetCount helper agrees with the actual page count.
+assert(pocketCertSheetCount(boysMb.length) === expectedSheets,
+  `pocketCertSheetCount(${boysMb.length}) === ${expectedSheets}`);
+assert(POCKET_CARDS_PER_SHEET === 8, `POCKET_CARDS_PER_SHEET === 8`);
+
+// Empty MB list still produces a single blank framed sheet (edge case guard).
+const emptyPocketBytes = await buildPocketCertsPDF([], {
+  defaultDate: POCKET_DEFAULT_DATE, troop: "96 B",
+  council: POCKET_COUNCIL, signature: POCKET_SIGNATURE,
+}, pdfLib);
+const parsedEmpty = await pdfLib.PDFDocument.load(emptyPocketBytes);
+assert(parsedEmpty.getPageCount() === 1,
+  `pocket PDF for zero rows still emits one page (blank cut-guide grid), got ${parsedEmpty.getPageCount()}`);
+
+// Text-content assertions: page 1 should contain the first scout's name,
+// the first badge, the default date (used when a row has no explicit date)
+// or the row's own date, and the council/signature fields.
+try {
+  const txtPath = path.join(outDir, "pocket-boys.txt");
+  child_process.execFileSync("pdftotext", ["-layout", pocketPath, txtPath], { stdio: "ignore" });
+  const txt = fs.readFileSync(txtPath, "utf-8");
+  fs.unlinkSync(txtPath);
+  // First card is row 0 (sorted by lastName then firstName then badge).
+  const first = boysMb[0];
+  assert(txt.indexOf(first.scoutName) >= 0,
+    `pocket PDF text contains the first scout's name ("${first.scoutName}")`);
+  assert(txt.indexOf(first.badge) >= 0,
+    `pocket PDF text contains the first badge ("${first.badge}")`);
+  assert(txt.indexOf(POCKET_COUNCIL) >= 0,
+    `pocket PDF text contains the council ("${POCKET_COUNCIL}")`);
+  assert(txt.indexOf(POCKET_SIGNATURE) >= 0,
+    `pocket PDF text contains the signature ("${POCKET_SIGNATURE}")`);
+  assert(txt.indexOf("96 B") >= 0,
+    `pocket PDF text contains the troop identifier ("96 B")`);
+  // Every row's date should appear somewhere (either the row's own date or
+  // the default date if that row was blank). Sample rows have real dates in
+  // the fixture, so at least the first row's date should appear as-is.
+  if (first.dateEarned) {
+    assert(txt.indexOf(first.dateEarned) >= 0,
+      `pocket PDF text contains the first row's Date Earned ("${first.dateEarned}")`);
+  }
+
+  // Signature-field-renders-with-default-date check: fabricate a row with
+  // an EMPTY dateEarned and build a single-card PDF; text must contain the
+  // default date AND the signature. This exercises the "no date" fallback
+  // path required by the smoke spec.
+  const noDateRows = [{
+    scoutName: "Test Scout", firstName: "Test", lastName: "Scout",
+    badge: "Camping", dateEarned: "",
+  }];
+  const noDateBytes = await buildPocketCertsPDF(noDateRows, {
+    defaultDate: POCKET_DEFAULT_DATE, troop: "96 B",
+    council: POCKET_COUNCIL, signature: POCKET_SIGNATURE,
+  }, pdfLib);
+  const noDatePath = path.join(outDir, "pocket-no-date.pdf");
+  const noDateTxtPath = path.join(outDir, "pocket-no-date.txt");
+  fs.writeFileSync(noDatePath, noDateBytes);
+  try {
+    child_process.execFileSync("pdftotext", ["-layout", noDatePath, noDateTxtPath], { stdio: "ignore" });
+    const noDateTxt = fs.readFileSync(noDateTxtPath, "utf-8");
+    fs.unlinkSync(noDateTxtPath);
+    assert(noDateTxt.indexOf(POCKET_DEFAULT_DATE) >= 0,
+      `no-date row: pocket PDF falls back to default date "${POCKET_DEFAULT_DATE}"`);
+    assert(noDateTxt.indexOf(POCKET_SIGNATURE) >= 0,
+      `no-date row: signature field still renders ("${POCKET_SIGNATURE}")`);
+    assert(noDateTxt.indexOf("Test Scout") >= 0,
+      `no-date row: scout name still renders`);
+    assert(noDateTxt.indexOf("Camping") >= 0,
+      `no-date row: badge name still renders`);
+  } finally {
+    try { fs.unlinkSync(noDatePath); } catch {}
+    try { fs.unlinkSync(noDateTxtPath); } catch {}
+  }
+} catch (err) {
+  console.log(`  skip: pdftotext failed on pocket-cert check (${err.message})`);
+}
+
+// (4b) Pocket state defaults are wired into the hydrated form.
+const pcCouncil = dom.window.document.getElementById("pc-council");
+const pcSig = dom.window.document.getElementById("pc-signature");
+const pcTroopA = dom.window.document.getElementById("pc-troop-a");
+const pcTroopB = dom.window.document.getElementById("pc-troop-b");
+const pcBtnA = dom.window.document.getElementById("btn-pocket-a");
+const pcBtnB = dom.window.document.getElementById("btn-pocket-b");
+assert(pcCouncil?.value === "Mid-Iowa Council",
+  `pocket council field defaults to "Mid-Iowa Council" (got "${pcCouncil?.value}")`);
+assert(pcSig?.value === "",
+  `pocket signature field defaults to empty (got "${pcSig?.value}")`);
+assert(pcTroopA?.value === "96 B",
+  `pocket Troop A identifier defaults to "96 B" (got "${pcTroopA?.value}")`);
+assert(pcTroopB?.value === "96 G",
+  `pocket Troop B identifier defaults to "96 G" (got "${pcTroopB?.value}")`);
+assert(pcBtnA && pcBtnA.disabled === true,
+  `pocket Troop A download button starts disabled (no CSV uploaded yet)`);
+assert(pcBtnB && pcBtnB.disabled === true,
+  `pocket Troop B download button starts disabled`);
+
+// (4c) Session migration backfills the `pocket` sub-state for older sessions.
+const legacyNoPocket = app.migrateSession({ version: 2, agenda: [] });
+assert(legacyNoPocket.pocket?.council === "Mid-Iowa Council",
+  `migrator backfills pocket.council for pre-1.3 sessions`);
+assert(Array.isArray(legacyNoPocket.pocket?.troopIdents) &&
+  legacyNoPocket.pocket.troopIdents[0] === "96 B" &&
+  legacyNoPocket.pocket.troopIdents[1] === "96 G",
+  `migrator backfills pocket.troopIdents = ["96 B", "96 G"] for pre-1.3 sessions`);
+// A partial pocket sub-state is honored where set and defaulted where missing.
+const partialPocket = app.migrateSession({
+  version: 2, agenda: [],
+  pocket: { signature: "Custom Signer" },
+});
+assert(partialPocket.pocket.signature === "Custom Signer",
+  `migrator preserves an existing pocket.signature`);
+assert(partialPocket.pocket.council === "Mid-Iowa Council",
+  `migrator fills in missing pocket.council`);
 
 if (failed) process.exit(1);
 console.log("\nAll smoke-test assertions passed.");

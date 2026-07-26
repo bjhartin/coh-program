@@ -156,6 +156,47 @@ export function parsePO(csvText, troopLabel = "") {
   };
 }
 
+/**
+ * Extract one entry per Merit Badge row for pocket-cert generation (v1.3.0).
+ *
+ * Returns an ordered list of `{ scoutName, firstName, lastName, badge, dateEarned }`,
+ * one per MB item in the PO CSV. Rank rows, misc-award rows, and rows with
+ * blank Item Type are excluded. Badge names have BSA store suffixes stripped
+ * ("Camping MB Emblem" → "Camping"). Date is passed through as the string
+ * exactly as it appears in the CSV (YYYY-MM-DD from Scoutbook exports); an
+ * empty string means "no date on this row — use the default".
+ *
+ * Ordered by (last, first, badge) so the printed sheets group by scout.
+ */
+export function extractMeritBadgeRows(csvText) {
+  const { records } = parseCSV(csvText);
+  const rows = [];
+  for (const row of records) {
+    const first = (row["First Name"] || "").trim();
+    const last = (row["Last Name"] || "").trim();
+    if (!first && !last) continue;
+    const itype = (row["Item Type"] || "").trim();
+    if (itype !== "Merit Badges") continue;
+    const raw = (row["Item Name"] || "").trim();
+    if (!raw) continue;
+    const badge = cleanItem(raw);
+    const dateEarned = (row["Date Earned"] || "").trim();
+    rows.push({
+      scoutName: `${first} ${last}`.trim(),
+      firstName: first,
+      lastName: last,
+      badge,
+      dateEarned,
+    });
+  }
+  rows.sort((a, b) =>
+    (a.lastName || "").localeCompare(b.lastName || "") ||
+    (a.firstName || "").localeCompare(b.firstName || "") ||
+    a.badge.localeCompare(b.badge)
+  );
+  return rows;
+}
+
 /** Guess a display label from a filename like "PO_T96BT_1103345.csv" -> "Troop 96B". */
 export function guessTroopLabel(filename) {
   if (!filename) return "";

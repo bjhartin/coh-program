@@ -44,7 +44,7 @@ Pages for the repository (Settings → Pages → **Source: GitHub Actions**).
 
 ## How to use it (volunteer flow)
 
-The app is five numbered steps down the page. Fill them out top to bottom:
+The app is six numbered steps down the page. Fill them out top to bottom:
 
 1. **Upload POs.** Drop the Scoutbook PO CSV for each troop into the two
    slots. The troop label auto-fills from the filename (`PO_T96BT_...` →
@@ -81,6 +81,33 @@ The app is five numbered steps down the page. Fill them out top to bottom:
      center.** Every page is placed upright (no rotation) and framed with a
      thin grey border inset 1/4" from each half-sheet edge so nothing lands
      in the printer's non-printable margin.
+6. **Pocket Certificates.** Generate BSA **Merit Badge pocket certificates**
+   as a PDF — 8 cards per landscape US Letter sheet, ready to cut apart
+   with a paper cutter. One button per troop; the label updates live to
+   show the card count and sheet count (e.g. *Download Troop 96B Pocket
+   Certificates PDF (160 cards on 20 sheets)*). Fill in:
+   - **Council** (default *Mid-Iowa Council*)
+   - **Signature** — free text, rendered in an oblique typeface as the
+     signing Scoutmaster / Advancement Chair's name. Leave blank to omit.
+   - **Default date earned** — used only for PO rows that have no *Date
+     Earned* value. Falls back to the Event Date if you leave it blank.
+   - **Troop identifier on cards** — free text per troop. Some legacy
+     card conventions render as *96 B* with a space; type whatever you
+     want on the printed cards. Defaults *96 B* / *96 G*.
+
+   Only merit badges get pocket certs from this tool — ranks and misc
+   awards use BSA's pre-printed cards, which are hand-filled. Print at
+   100% scale (no fit-to-page) and cut on the light grey guides that
+   frame every card slot.
+
+   **Font limitation.** pdf-lib's standard font set doesn't include a
+   cursive/script face, so the signature is rendered with
+   `Helvetica-Oblique` — a sloped sans that reads as a signature at
+   11pt but isn't a true script. Embedding a Google Font (Great Vibes,
+   Kalam, etc.) would add fidelity but require a network fetch that
+   breaks the "open the file directly from disk" story. If that
+   tradeoff feels acceptable, patch `pocket-cert-builder.js` to embed
+   the font of your choice with `pdf.embedFont(bytes)`.
 
 At any time you can hit **Save session** to download a JSON snapshot of
 every field (including the raw CSVs), so you can re-open the same CoH next
@@ -146,6 +173,7 @@ apps/coh-program/
 ├── app.js             DOM glue: state, upload/drop, agenda editor, preview
 ├── data.js            CSV parser + roster normalization (Node + browser)
 ├── pdf-builder.js     pdf-lib page layout + saddle-stitch imposition
+├── pocket-cert-builder.js  pdf-lib layout for BSA MB pocket certificates (8-up)
 ├── assets/
 │   └── fleur-de-lis.jpg  Cover logo (also used as favicon)
 ├── test/
@@ -190,16 +218,20 @@ npm install         # first time only, installs pdf-lib for the test
 node test/smoke.mjs
 ```
 
-It writes `test/source.pdf` and `test/out.pdf` and asserts that the imposed
-booklet is 4 landscape US-Letter pages, matching the pdfjam reference in
-`data/courts-of-honor/07-27-2026/Court of Honor Program - Jul 27 2026
-(booklet-flow) - manual edits-BOOKLET.pdf`.
+It writes `test/source.pdf`, `test/out.pdf`, and `test/pocket-boys.pdf`
+and asserts that the imposed booklet is 6 landscape US-Letter pages, that
+the pocket-cert PDF is `ceil(N/8)` landscape pages, and a broad set of
+per-row text-render assertions on the pocket cards (scout / badge / date /
+council / signature / troop identifier).
 
 ## Future work
 
-- Custom fonts / theming beyond Helvetica
+- Custom fonts / theming beyond Helvetica (including a true script font
+  for pocket-cert signatures)
 - Full WYSIWYG rich-text editing of individual scout lines
 - Auto-diff against the previous CoH (what's changed since last time?)
 - Historical Eagle standing recognition list
 - Multi-page cover art / photos
 - Non-BSA (Girl Scouts, Trail Life, etc.) templates
+- Avery 5162 mailing-label sheet for scout pocket-cert distribution (the
+  Python source has this — port when needed)

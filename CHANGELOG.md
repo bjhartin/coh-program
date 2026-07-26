@@ -3,6 +3,71 @@
 All notable changes to the Court of Honor Program Generator will be tracked
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] — 2026-07-26
+
+### Added
+
+- **Pocket Certificates step** (new Step 6). Generates BSA Merit Badge
+  pocket certificates as a PDF — 8 cards per landscape US Letter sheet,
+  ready to cut apart with a paper cutter. Only merit badges are printed;
+  ranks and misc awards use BSA's pre-printed cards (hand-filled).
+  - Per-troop download button ("Download Troop 96B Pocket Certificates PDF
+    (160 cards on 20 sheets)"), with the count/sheet math updating live as
+    the PO is uploaded or the troop label changes.
+  - New form fields: **Council** (default "Mid-Iowa Council"), **Signature**
+    (blank — volunteer types the signing Scoutmaster / Advancement Chair),
+    **Default date earned** (falls back to the Event Date if left blank —
+    used only for PO rows with no per-row Date Earned), **Troop identifier
+    on cards** for each troop (defaults "96 B" / "96 G" — free text so
+    volunteers can match legacy card conventions).
+  - Filenames follow the convention `<Troop-Label>-pocket-certificates.pdf`
+    (e.g. `Troop-96B-pocket-certificates.pdf`).
+- New `data.js` export **`extractMeritBadgeRows(csvText)`** — returns an
+  ordered list of `{ scoutName, firstName, lastName, badge, dateEarned }`
+  suitable for pocket-cert generation. Filters out ranks and misc awards,
+  strips BSA store suffixes, sorts by last/first/badge.
+- New module **`pocket-cert-builder.js`** — pure pdf-lib PDF assembly for
+  the 2x4 pocket-cert grid, with cut-guide borders on every card slot
+  (including blank slots on the final sheet) so the printed cut-line grid
+  is complete.
+
+### Design decision — new step vs. augmenting Download
+
+Chose a **separate Step 6** rather than folding pocket certs into the
+existing Download step. Pocket certs have their own inputs (Council,
+Signature, per-troop card identifier, default-date-earned override) that
+don't belong in Event Details, and they produce a distinct family of
+artifacts on a different print workflow (cut-apart cards, not folded
+booklet). Grouping the new inputs under Download would have crowded that
+step and hidden fields that don't affect the program PDFs. The tradeoff
+is one more step down the page; the volunteer flow reads naturally
+top-to-bottom regardless.
+
+### Under the hood
+
+- `state.pocket = { council, signature, defaultDate, troopIdents[] }`
+  is a new sub-state. `migrateSession()` backfills it on any pre-1.3
+  session (missing fields → defaults; partial overrides honored).
+- Pocket-cert card layout ports the padding, type sizes, and vertical
+  rhythm from `scripts/generate_mb_pocket_certificates.py` /
+  `scripts/templates/pocket-cert-page.html` (0.618" top / 0.382" bottom
+  padding, 12/10/11/11pt type sizes, 0.43125" gap under the badge).
+- Signature is rendered with `StandardFonts.HelveticaOblique`. pdf-lib's
+  standard fonts don't include a cursive/script face; using an embedded
+  Google Font (Great Vibes, Kalam, etc.) would work but adds a network
+  dependency incompatible with the "open the file directly" story. Noted
+  as a known limitation in the README.
+
+### Tests
+
+- 27 new smoke assertions covering: MB-only filter (no ranks/emblem
+  suffixes leaking through), extractor row count agreement with
+  `parsePO()`, PDF page count = `ceil(N/8)`, page-0 size = 792×612 pt,
+  scout/badge/council/signature/troop text rendering on page 1, default
+  date fallback when the row has no Date Earned, single blank sheet for
+  the zero-rows edge case, form-field default values, and migration
+  backfill.
+
 ## [1.2.3] — 2026-07-26
 
 ### Changed

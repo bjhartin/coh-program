@@ -202,6 +202,7 @@ fieldset label { flex-direction: row; align-items: center; gap: 6px; font-size: 
 
 /* Download */
 .download-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.fieldhint { font-size: 11px; color: var(--hint); font-weight: 400; margin-top: 2px; display: block; }
 
 .site-footer {
   padding: 20px 24px;
