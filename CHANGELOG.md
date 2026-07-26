@@ -3,6 +3,27 @@
 All notable changes to the Court of Honor Program Generator will be tracked
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.4] — 2026-07-26
+
+### Fixed
+
+- **Eagle Palm color qualifier no longer stripped.** `cleanItem()` in
+  `data.js` was treating `" (Gold)"`, `" (Silver)"`, and `" (Bronze)"` as
+  decorative suffixes on every item, so a Scoutbook PO line like
+  `"Eagle Palm Pin (Gold)"` rendered in the printed program as just
+  `"Eagle Palm Pin"` — losing the Bronze/Gold/Silver distinction that
+  actually identifies which Eagle Palm was awarded. `cleanItem()` now
+  preserves the color qualifier when the base name is `"Eagle Palm Pin"`
+  or `"Eagle Palm"`. Discovered while cross-referencing the app-generated
+  booklet against the hand-edited program for CoH 2026-07-27 (Emma Adair's
+  Eagle Palm Pin (Gold) was rendering without the color).
+
+### Tests
+
+- Added `cleanItem` assertions covering Eagle Palm Bronze/Silver/Gold
+  preservation, plus regression coverage that `" MB Emblem"`,
+  `" Rank Emblem"`, and non-Eagle-Palm `"(Gold)"` stripping still work.
+
 ## [1.3.3] — 2026-07-26
 
 ### Changed

@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import * as pdfLib from "pdf-lib";
 
-import { parsePO, guessTroopLabel, buildRoster, extractMeritBadgeRows } from "../data.js";
+import { parsePO, guessTroopLabel, buildRoster, extractMeritBadgeRows, cleanItem } from "../data.js";
 import { buildSourcePDF, buildBookletPDF } from "../pdf-builder.js";
 import { buildPocketCertsPDF, pocketCertSheetCount, POCKET_CARDS_PER_SHEET } from "../pocket-cert-builder.js";
 
@@ -630,6 +630,28 @@ assert(girlsMb.length === girlsMbFromParsed,
 const RANK_NAMES = ["Scout", "Tenderfoot", "Second Class", "First Class", "Star", "Life", "Eagle", "Eagle Palm", "Star Scout", "Life Scout", "Eagle Scout"];
 assert(!badgeNames.some((b) => RANK_NAMES.includes(b)),
   "no extracted MB row is actually a rank");
+
+// --- (4.z) cleanItem must preserve color qualifiers on Eagle Palms (v1.3.4)
+// so "Eagle Palm Pin (Gold)" stays "Eagle Palm Pin (Gold)" — Bronze/Gold/Silver
+// distinguish Eagle Palm awards. Regular MB rows with a stripped color suffix
+// (there shouldn't be any, but be defensive) still get the qualifier removed.
+assert(cleanItem("Eagle Palm Pin (Gold)") === "Eagle Palm Pin (Gold)",
+  `cleanItem preserves Eagle Palm Pin color (got "${cleanItem("Eagle Palm Pin (Gold)")}")`);
+assert(cleanItem("Eagle Palm Pin (Silver)") === "Eagle Palm Pin (Silver)",
+  `cleanItem preserves Eagle Palm Pin Silver`);
+assert(cleanItem("Eagle Palm Pin (Bronze)") === "Eagle Palm Pin (Bronze)",
+  `cleanItem preserves Eagle Palm Pin Bronze`);
+assert(cleanItem("Eagle Palm (Gold)") === "Eagle Palm (Gold)",
+  `cleanItem preserves Eagle Palm color`);
+// Regular MB emblem stripping unchanged
+assert(cleanItem("Camping MB Emblem") === "Camping",
+  `cleanItem still strips " MB Emblem"`);
+assert(cleanItem("Star Rank Emblem") === "Star",
+  `cleanItem still strips " Rank Emblem"`);
+// A non-Eagle-Palm item ending in "(Gold)" still has the color stripped
+// (no known real BSA item, but keeps prior behavior for anything unexpected).
+assert(cleanItem("Some Award (Gold)") === "Some Award",
+  `cleanItem strips "(Gold)" from non-Eagle-Palm items`);
 
 // Build a pocket cert PDF for the boys and validate structure.
 const POCKET_DEFAULT_DATE = "July 27, 2026";

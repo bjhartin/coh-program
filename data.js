@@ -42,6 +42,17 @@ const ITEM_SUFFIXES = [
   " (Bronze)",
 ];
 
+// Items whose color qualifier is meaningful (do NOT strip). If the item's
+// base name (everything before " (Color)") is in this set, we keep the color
+// suffix — e.g. "Eagle Palm Pin (Gold)" must NOT become "Eagle Palm Pin"
+// because Bronze / Gold / Silver distinguish Eagle Palm awards.
+const KEEP_COLOR_QUALIFIER_BASES = new Set([
+  "Eagle Palm Pin",
+  "Eagle Palm",
+]);
+
+const COLOR_SUFFIX_RE = /\s+\((Gold|Silver|Bronze)\)$/;
+
 /** Strip trailing decorative text so "Camping MB Emblem" -> "Camping". */
 export function cleanItem(name) {
   let n = (name || "").trim();
@@ -51,6 +62,13 @@ export function cleanItem(name) {
     changed = false;
     for (const suf of ITEM_SUFFIXES) {
       if (n.endsWith(suf)) {
+        // If this is a color qualifier and the base name is one where color
+        // is meaningful (Eagle Palms), don't strip.
+        const colorMatch = suf.match(COLOR_SUFFIX_RE);
+        if (colorMatch) {
+          const base = n.slice(0, -suf.length).trim();
+          if (KEEP_COLOR_QUALIFIER_BASES.has(base)) continue;
+        }
         n = n.slice(0, -suf.length).trim();
         changed = true;
       }
